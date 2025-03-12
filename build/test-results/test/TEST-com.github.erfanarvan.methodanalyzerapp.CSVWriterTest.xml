@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.github.erfanarvan.methodanalyzerapp.CSVWriterTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2025-03-11T20:48:00" hostname="Erfans-MBP" time="0.01">
+  <properties/>
+  <testcase name="testWriteAndReadCSV()" classname="com.github.erfanarvan.methodanalyzerapp.CSVWriterTest" time="0.01"/>
+  <system-out><![CDATA[CSV file created at: results/test_output.csv
+Checking CSV at path: results/test_output.csv
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
