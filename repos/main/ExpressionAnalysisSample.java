@@ -95,5 +95,21 @@ class HelperClass {
     public static void processStatic() {
         System.out.println("Processing static method");
     }
+
+    @Override
+    public String toString() {
+        return "ExpressionAnalysisSample";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        return this == o;
+    }
+
+    @Override
+    public int hashCode() {
+        return 42;
+    }
+
 }
 

@@ -17,6 +17,8 @@ import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
+import com.github.javaparser.resolution.declarations.*;
+import com.github.javaparser.resolution.types.*;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -35,6 +37,8 @@ public class MethodExtractor {
     private static final int TIMEOUT_MS = 1000;
     private static final int TIMEOUT_MS_TYPE = 500;
 
+    private final CSVWriter projectSpecificWriter;
+
     /**
      * Initializes a MethodExtractor to analyze and extract information from methods
      * within a given Java file.
@@ -44,13 +48,22 @@ public class MethodExtractor {
      * @param projectWriter    The CSV writer used to store method data for the current project.
      * @param aggregatedWriter The CSV writer used to store aggregated method data across projects.
      */
-    public MethodExtractor(File javaFile, CompilationUnit cu, CSVWriter projectWriter, CSVWriter aggregatedWriter) {
+    public MethodExtractor(
+            File javaFile,
+            CompilationUnit cu,
+            CSVWriter projectWriter,
+            CSVWriter aggregatedWriter,
+            CSVWriter projectSpecificWriter
+    ) {
         this.javaFile = javaFile;
         this.cu = cu;
         this.projectWriter = projectWriter;
         this.aggregatedWriter = aggregatedWriter;
-        this.packageName = cu.getPackageDeclaration().map(pd -> pd.getName().asString()).orElse("");
+        this.projectSpecificWriter = projectSpecificWriter;
+        this.packageName =
+                cu.getPackageDeclaration().map(pd -> pd.getName().asString()).orElse("");
     }
+
 
     /**
      * Extracts and processes all methods from the Java file.
@@ -64,7 +77,8 @@ public class MethodExtractor {
     public void extract() {
         cu.findAll(ClassOrInterfaceDeclaration.class).forEach(clazz -> {
             String className = clazz.getNameAsString();
-            clazz.findAll(MethodDeclaration.class).forEach(method -> processMethodWithTimeout(className, method));
+            clazz.findAll(MethodDeclaration.class)
+                    .forEach(method -> processMethod(className, method));
         });
     }
 
@@ -116,7 +130,12 @@ public class MethodExtractor {
         String returnType = method.getTypeAsString();
         int numParams = method.getParameters().size();
 
-        List<String> parameterTypes = MethodParameterExtractor.getResolvedParameterTypes(method);
+        List<String> parameterTypes =
+                method.getParameters()
+                        .stream()
+                        .map(p -> p.getType().asString())
+                        .collect(java.util.stream.Collectors.toList());
+
         Map<String, List<String>> parTypeCounts =
                 TypeCounter.countStandardAndCustomTypes(parameterTypes);
 
@@ -136,12 +155,14 @@ public class MethodExtractor {
 
         String javadoc = getJavadocText(method);
 
-        List<String> expressionTypes = method.findAll(Expression.class).stream()
-                .filter(exp -> !(exp instanceof AnnotationExpr))  // Ignore annotations (@Override, @NonNull)
-                .filter(exp -> !(exp instanceof LiteralExpr))      // Ignore literals (false, 0, "text", null)
-                .map(this::resolveExpressionType)
-                .filter(type -> !type.isEmpty())
-                .collect(Collectors.toList());
+//        List<String> expressionTypes = method.findAll(Expression.class).stream()
+//                .filter(exp -> !(exp instanceof AnnotationExpr))  // Ignore annotations (@Override, @NonNull)
+//                .filter(exp -> !(exp instanceof LiteralExpr))      // Ignore literals (false, 0, "text", null)
+//                .map(this::resolveExpressionType)
+//                .filter(type -> !type.isEmpty())
+//                .collect(Collectors.toList());
+        List<String> expressionTypes = List.of(); // disabled
+
 
         Map<String, List<String>> exTypeCounts =
                 TypeCounter.countStandardAndCustomTypes(expressionTypes);
@@ -175,9 +196,9 @@ public class MethodExtractor {
         int allCustomsCount =
                 setCustom.size() + parUnresolvedTypes.size()+exUnresolvedTypes.size();
 
-        int[] lineCounts = MethodLineCounter.countMethodLines(method);
-        int rawLoc = lineCounts[0];
-        int cleanLoc = lineCounts[1];
+        int rawLoc = -1;
+        int cleanLoc = -1;
+
 
         //System.out.println(" Expression types: " + expressionTypes.toString
         // () + "\nfor " + method.findAll(Expression.class).toString());
@@ -206,6 +227,11 @@ public class MethodExtractor {
 
         projectWriter.write(csvLine);
         aggregatedWriter.write(csvLine);
+
+        if (!overridesStandardJavaMethod(method)) {
+            projectSpecificWriter.write(csvLine);
+        }
+
     }
 
     /**
@@ -292,5 +318,65 @@ public class MethodExtractor {
             }
     }
 
+
+
+    private boolean overridesStandardJavaMethod(MethodDeclaration method) {
+        try {
+            ResolvedMethodDeclaration resolved = method.resolve();
+            ResolvedReferenceTypeDeclaration declaringType =
+                    resolved.declaringType();
+
+            for (ResolvedReferenceType ancestor : declaringType.getAllAncestors()) {
+                Optional<ResolvedReferenceTypeDeclaration> ancestorDecl =
+                        ancestor.getTypeDeclaration();
+
+                if (ancestorDecl.isEmpty()) continue;
+
+                ResolvedReferenceTypeDeclaration ancestorType =
+                        ancestorDecl.get();
+
+                // only care about java.* ancestors
+                if (!ancestorType.getQualifiedName().startsWith("java.")) {
+                    continue;
+                }
+
+                // check if ancestor declares a matching method
+                for (ResolvedMethodDeclaration m : ancestorType.getDeclaredMethods()) {
+                    if (methodsMatch(resolved, m)) {
+                        return true; // overrides java.* method
+                    }
+                }
+            }
+
+            return false;
+
+        } catch (Exception e) {
+            // resolution failure → treat as project-specific
+            return false;
+        }
+    }
+
+    private boolean methodsMatch(
+            ResolvedMethodDeclaration m1,
+            ResolvedMethodDeclaration m2
+    ) {
+        if (!m1.getName().equals(m2.getName())) {
+            return false;
+        }
+
+        if (m1.getNumberOfParams() != m2.getNumberOfParams()) {
+            return false;
+        }
+
+        for (int i = 0; i < m1.getNumberOfParams(); i++) {
+            if (!m1.getParam(i).getType()
+                    .describe()
+                    .equals(m2.getParam(i).getType().describe())) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
 }

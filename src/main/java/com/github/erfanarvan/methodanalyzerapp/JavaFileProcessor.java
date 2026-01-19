@@ -17,6 +17,8 @@ public class JavaFileProcessor {
     private final CSVWriter aggregatedWriter;
     private static final int PARSE_TIMEOUT_MS = 5000; // ⏳ 5 seconds timeout for parsing
 
+    private final CSVWriter projectSpecificWriter;
+
     /**
      * Initializes a JavaFileProcessor to analyze and extract method information from a Java source file.
      * <p>
@@ -28,11 +30,18 @@ public class JavaFileProcessor {
      * @param projectWriter    The CSV writer used to store method data for the current project.
      * @param aggregatedWriter The CSV writer used to store aggregated method data across multiple projects.
      */
-    public JavaFileProcessor(File javaFile, CSVWriter projectWriter, CSVWriter aggregatedWriter) {
+    public JavaFileProcessor(
+            File javaFile,
+            CSVWriter projectWriter,
+            CSVWriter aggregatedWriter,
+            CSVWriter projectSpecificWriter
+    ) {
         this.javaFile = javaFile;
         this.projectWriter = projectWriter;
         this.aggregatedWriter = aggregatedWriter;
+        this.projectSpecificWriter = projectSpecificWriter;
     }
+
 
 
     /**
@@ -55,7 +64,14 @@ public class JavaFileProcessor {
 
             if (cu != null) {
                 // Pass the parsed file to MethodExtractor
-                MethodExtractor extractor = new MethodExtractor(javaFile, cu, projectWriter, aggregatedWriter);
+                MethodExtractor extractor =
+                        new MethodExtractor(
+                                javaFile,
+                                cu,
+                                projectWriter,
+                                aggregatedWriter,
+                                projectSpecificWriter
+                        );
                 extractor.extract();
             }
 
