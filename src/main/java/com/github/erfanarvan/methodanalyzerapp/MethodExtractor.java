@@ -247,7 +247,7 @@ public class MethodExtractor {
                         ancestorDecl.get();
 
                 // only care about java.* ancestors
-                if (!ancestorType.getQualifiedName().startsWith("java.")) {
+                if (!isStandardLibrary(ancestorType.getQualifiedName())) {
                     continue;
                 }
 
@@ -262,8 +262,8 @@ public class MethodExtractor {
             return false;
 
         } catch (Exception e) {
-            // resolution failure → treat as project-specific
-            return false;
+            // resolution failure → treat as standard
+            return true;
         }
     }
 
@@ -289,5 +289,14 @@ public class MethodExtractor {
 
         return true;
     }
+
+    private boolean isStandardLibrary(String qname) {
+        return qname.startsWith("java.")
+                || qname.startsWith("javax.")
+                || qname.startsWith("sun.")
+                || qname.startsWith("com.sun.")
+                || qname.startsWith("jdk.");
+    }
+
 
 }
