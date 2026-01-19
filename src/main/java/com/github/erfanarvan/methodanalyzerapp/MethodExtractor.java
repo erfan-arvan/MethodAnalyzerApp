@@ -110,6 +110,7 @@ public class MethodExtractor {
         }
     }
 
+
     /**
      * Extracts and processes detailed information from a given method.
      * <p>
@@ -127,112 +128,22 @@ public class MethodExtractor {
      */
     private void processMethod(String className, MethodDeclaration method) {
         String methodName = method.getNameAsString();
-        String returnType = method.getTypeAsString();
+        String returnType = method.getType().asString();
         int numParams = method.getParameters().size();
+        String access = method.getAccessSpecifier().asString();
 
-        List<String> parameterTypes =
-                method.getParameters()
-                        .stream()
-                        .map(p -> p.getType().asString())
-                        .collect(java.util.stream.Collectors.toList());
-
-        Map<String, List<String>> parTypeCounts =
-                TypeCounter.countStandardAndCustomTypes(parameterTypes);
-
-        List<String> parStandardTypes = parTypeCounts.get("standardTypes");
-        List<String> parCustomTypes = parTypeCounts.get("customTypes");
-        List<String> parUnresolvedTypes = parTypeCounts.get("unresolvedTypes");
-
-        String accessModifier = method.getAccessSpecifier().asString();
-        String annotations = method.getAnnotations().stream()
-                .map(a -> a.getNameAsString())
-                .collect(Collectors.joining(", "));
-        String isStatic = String.valueOf(method.isStatic());
-        String isDefault = String.valueOf(method.isDefault());
-        String isFinal = String.valueOf(method.isFinal());
-        String isAbstract = String.valueOf(method.isAbstract());
-
-
-        String javadoc = getJavadocText(method);
-
-//        List<String> expressionTypes = method.findAll(Expression.class).stream()
-//                .filter(exp -> !(exp instanceof AnnotationExpr))  // Ignore annotations (@Override, @NonNull)
-//                .filter(exp -> !(exp instanceof LiteralExpr))      // Ignore literals (false, 0, "text", null)
-//                .map(this::resolveExpressionType)
-//                .filter(type -> !type.isEmpty())
-//                .collect(Collectors.toList());
-        List<String> expressionTypes = List.of(); // disabled
-
-
-        Map<String, List<String>> exTypeCounts =
-                TypeCounter.countStandardAndCustomTypes(expressionTypes);
-
-        List<String> exStandardTypes = exTypeCounts.get("standardTypes");
-        List<String> exCustomTypes = exTypeCounts.get("customTypes");
-        List<String> exUnresolvedTypes = exTypeCounts.get("unresolvedTypes");
-
-        //Convert the list to set to only count the unique types for standard
-        // types
-        Set<String> setStandard = Stream.concat(parStandardTypes.stream(),
-                        exStandardTypes.stream())
-                .collect(Collectors.toSet());
-
-        // Convert to set to only count the unique types for custom types,
-        // but we do not need to do this for unresolved ones since we
-        // consider any of unresolved ones as a separate type.
-        Set<String> setCustom = Stream.concat(parCustomTypes.stream(),
-                        exCustomTypes.stream())
-                .collect(Collectors.toSet());
-        if(TypeUtils.isStandardType(returnType)){
-            setStandard.add(returnType);
-        } else setCustom.add(returnType);
-
-        //Num of all unique standard types of parameters, expressions, and
-        // possibly return type if it's standard
-        int allStandardCount = setStandard.size();
-
-        //Num of all unique custom types of parameters, expressions, and
-        // possibly return type if it's standard
-        int allCustomsCount =
-                setCustom.size() + parUnresolvedTypes.size()+exUnresolvedTypes.size();
-
-        int rawLoc = -1;
-        int cleanLoc = -1;
-
-
-        //System.out.println(" Expression types: " + expressionTypes.toString
-        // () + "\nfor " + method.findAll(Expression.class).toString());
         String csvLine = String.join(",",
-                methodName, javaFile.getPath(), className, packageName,
-                CSVWriter.sanitizeForCSV(returnType),
-                isFinal, isAbstract, isDefault, isStatic,
-                CSVWriter.sanitizeForCSV(String.valueOf(numParams)),
-                CSVWriter.sanitizeForCSV(parameterTypes.toString()),
-                String.valueOf(parStandardTypes.size()),
-                String.valueOf(parCustomTypes.size()),
-                String.valueOf(parUnresolvedTypes.size()),
-                CSVWriter.sanitizeForCSV(accessModifier),
-                CSVWriter.sanitizeForCSV(annotations),
-                CSVWriter.sanitizeForCSV(javadoc),
-                CSVWriter.sanitizeForCSV(method.findAll(Expression.class).toString()),
-                CSVWriter.sanitizeForCSV(expressionTypes.toString()),
-                String.valueOf(exStandardTypes.size()),
-                String.valueOf(exCustomTypes.size()),
-                String.valueOf(exUnresolvedTypes.size()),
-                String.valueOf(rawLoc),
-                String.valueOf(cleanLoc),
-                String.valueOf(allStandardCount),
-                String.valueOf(allCustomsCount)
+                method.getNameAsString(),
+                javaFile.getPath(),
+                className,
+                packageName
         );
-
-        projectWriter.write(csvLine);
-        aggregatedWriter.write(csvLine);
 
         if (!overridesStandardJavaMethod(method)) {
             projectSpecificWriter.write(csvLine);
         }
-
     }
+
 
     /**
      * Extracts the Javadoc comment associated with the given method.

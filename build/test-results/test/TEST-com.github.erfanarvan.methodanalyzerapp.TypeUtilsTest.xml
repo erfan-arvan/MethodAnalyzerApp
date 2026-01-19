@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.github.erfanarvan.methodanalyzerapp.TypeUtilsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-19T14:00:53" hostname="Erfans-MBP" time="0.004">
+<testsuite name="com.github.erfanarvan.methodanalyzerapp.TypeUtilsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-19T14:41:19" hostname="Erfans-MBP" time="0.006">
   <properties/>
   <testcase name="testNullOrEmptyTypes()" classname="com.github.erfanarvan.methodanalyzerapp.TypeUtilsTest" time="0.001"/>
   <testcase name="testStandardTypes()" classname="com.github.erfanarvan.methodanalyzerapp.TypeUtilsTest" time="0.0"/>
